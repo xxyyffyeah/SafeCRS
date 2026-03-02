@@ -297,6 +297,12 @@ def parse_args():
     misc.add_argument(
         "--verbose", action="store_true", help="Enable verbose LR scheduler output."
     )
+    misc.add_argument(
+        "--advantage_mode",
+        default="grpo",
+        choices=["grpo", "gdpo"],
+        help="Advantage computation: grpo (sum_then_normalize) or gdpo (normalize_then_sum).",
+    )
 
     return parser.parse_args()
 
@@ -367,7 +373,7 @@ def main():
         _to_sequence_reward(safety_item_func, reduction="sum"),
     ]
     accelerator.print(
-        f"[GRPO] Rewards enabled: relevance(first-rank) + safety(sum), "
+        f"[{args.advantage_mode.upper()}] Rewards enabled: relevance(first-rank) + safety(sum), "
         f"lambda_safe={args.lambda_safe}, penalty_safe={args.penalty_safe}"
     )
 
@@ -377,8 +383,16 @@ def main():
         )
         reward_func.append(_to_sequence_reward(count_item_func))
         accelerator.print(
-            f"[GRPO] Count penalty enabled: target={args.target_count}, lambda={args.lambda_count}"
+            f"[{args.advantage_mode.upper()}] Count penalty enabled: target={args.target_count}, lambda={args.lambda_count}"
         )
+
+    # Map advantage_mode to TRL's multi_objective_aggregation
+    multi_objective_aggregation = (
+        "sum_then_normalize" if args.advantage_mode == "grpo" else "normalize_then_sum"
+    )
+    accelerator.print(
+        f"[{args.advantage_mode.upper()}] Using multi_objective_aggregation={multi_objective_aggregation}"
+    )
 
     if args.sft_model_path:
         sft_model_path = args.sft_model_path
@@ -408,7 +422,7 @@ def main():
     lora_suffix = f"_lora_r{args.lora_r}" if args.use_lora else ""
     output_dir = (
         f"./results/safe_grpo/{args.model_name}"
-        f"_grpo{lora_suffix}"
+        f"_{args.advantage_mode}{lora_suffix}"
         f"_lr{args.lr}_kl{args.kl_beta}_mu{args.mu}"
         f"_hitreward"
     )
@@ -461,11 +475,12 @@ def main():
         gradient_checkpointing_kwargs={"use_reentrant": False} if args.gradient_checkpointing else None,
         run_name=run_name,
         reward_weights=args.reward_weights,
+        multi_objective_aggregation=multi_objective_aggregation,
         eval_strategy=args.eval_strategy,
         eval_steps=args.eval_steps if args.eval_strategy == "steps" else None,
     )
     if args.reward_weights:
-        accelerator.print(f"[GRPO] Reward weights: {args.reward_weights}")
+        accelerator.print(f"[{args.advantage_mode.upper()}] Reward weights: {args.reward_weights}")
 
     # Build LoRA config if enabled
     peft_config = None
@@ -492,7 +507,9 @@ def main():
         peft_config=peft_config,
     )
 
-    accelerator.print("Training Safe-GRPO (original GRPO trainer, sequence-level rewards)...")
+    accelerator.print(
+        f"Training Safe-{args.advantage_mode.upper()} (original GRPO trainer, sequence-level rewards)..."
+    )
     trainer.train(resume_from_checkpoint=args.resume)
     accelerator.print("✅ Done")
 
