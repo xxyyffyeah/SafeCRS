@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
-CUDA_VISIBLE_DEVICES=0,1 torchrun --nproc_per_node=2 --master_port=29505 train_grpo_safe.py \
+
+RUN_TAG="$(date +%Y%m%d_%H%M%S)"
+CUDA_VISIBLE_DEVICES=0,1 torchrun --nproc_per_node=2 --master_port=29506 train_grpo_safe.py \
   --train_path ./downloaded_datasets/processed_datasets/saferec_grpo_dataset \
   --val_path ./downloaded_datasets/processed_datasets/saferec_sft_dataset/validation \
   --eval_strategy steps \
@@ -11,9 +13,9 @@ CUDA_VISIBLE_DEVICES=0,1 torchrun --nproc_per_node=2 --master_port=29505 train_g
   --reward_func log_decay \
   --lambda_safe 0.1 \
   --penalty_safe 1.0 \
-  --lambda_count 1.0 \
+  --lambda_count 0.1 \
   --target_count 10 \
-  --reward_weights 30 1 1 \
+  --reward_weights 1 1 1 \
   --use_lora \
   --lora_r 256 \
   --lora_alpha 512 \
@@ -22,7 +24,6 @@ CUDA_VISIBLE_DEVICES=0,1 torchrun --nproc_per_node=2 --master_port=29505 train_g
   --mu 1 \
   --per_device_train_batch_size 4 \
   --gradient_accumulation_steps 8 \
-  --max_steps 1000 \
   --logging_steps 1 \
   --save_steps 200 \
   --bf16 \
@@ -35,6 +36,6 @@ CUDA_VISIBLE_DEVICES=0,1 torchrun --nproc_per_node=2 --master_port=29505 train_g
   --max_completion_length 1024 \
   --gradient_checkpointing \
   --wandb_project safe_rank_grpo_recall_eval \
-  --run_name gdpo_tp1_nocatalog_noseen_eval200_$(date +%Y%m%d_%H%M%S) \
+  --run_name gdpo_tp1_nocatalog_noseen_eval200_${RUN_TAG} \
   --wandb_force_new_run \
   --seed 3407
