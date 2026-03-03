@@ -85,7 +85,7 @@ Safe-SFT fine-tunes the base model on SafeRec data where:
 2. Constraint descriptions are injected into prompts
 
 ```bash
-accelerate launch --config_file configs/llama32_3b_sft.yaml train_sft_safe.py \
+torchrun --nproc_per_node=2 train_sft_safe.py \
     --dataset_path ./downloaded_datasets/processed_datasets/saferec_sft_dataset \
     --model_name meta-llama/Llama-3.2-3B-Instruct \
     --num_train_epochs 10 \
@@ -110,7 +110,7 @@ Safe-GDPO refines the policy using three reward signals with decoupled normaliza
 #### Option A: TRL GRPOTrainer (Sequence-level)
 
 ```bash
-accelerate launch --config_file configs/llama32_3b_grpo.yaml train_grpo_safe.py \
+torchrun --nproc_per_node=2 train_grpo_safe.py \
     --train_path ./downloaded_datasets/processed_datasets/saferec_grpo_dataset \
     --model_name meta-llama/Llama-3.2-3B-Instruct \
     --sft_model_path ./results/meta-llama/Llama-3.2-3B-Instruct/checkpoint-800 \
@@ -120,14 +120,19 @@ accelerate launch --config_file configs/llama32_3b_grpo.yaml train_grpo_safe.py 
     --kl_beta 1e-3 \
     --lambda_safe 1.0 \
     --penalty_safe 1.0 \
+    --per_device_train_batch_size 4 \
+    --gradient_accumulation_steps 8 \
+    --num_generations 8 \
+    --save_steps 200 \
     --use_vllm \
+    --vllm_gpu_memory_utilization 0.4 \
     --bf16
 ```
 
 #### Option B: RankGRPOTrainer (Item-level, recommended)
 
 ```bash
-accelerate launch --config_file configs/llama32_3b_grpo.yaml train_rank_grpo_safe.py \
+torchrun --nproc_per_node=2 train_rank_grpo_safe.py \
     --train_path ./downloaded_datasets/processed_datasets/saferec_grpo_dataset \
     --model_name meta-llama/Llama-3.2-3B-Instruct \
     --sft_model_path ./results/meta-llama/Llama-3.2-3B-Instruct/checkpoint-800 \
@@ -144,8 +149,13 @@ accelerate launch --config_file configs/llama32_3b_grpo.yaml train_rank_grpo_saf
     --penalty_safe 1.0 \
     --lambda_count 1.0 \
     --target_count 10 \
+    --per_device_train_batch_size 4 \
+    --gradient_accumulation_steps 8 \
+    --num_generations 8 \
+    --save_steps 200 \
     --gradient_checkpointing \
     --use_vllm \
+    --vllm_gpu_memory_utilization 0.4 \
     --bf16
 ```
 
