@@ -18,42 +18,50 @@ Building upon [Rank-GRPO](https://arxiv.org/abs/2506.05889) (Zhu et al., 2025), 
 ## Environment Setup
 
 ```bash
-# Create conda environment
-conda create -n safecrs python==3.10.0
-conda activate safecrs
+# Option 1: Create from environment file (recommended)
+conda env create -f environment_safe.yml
+conda activate safe
 
-# Install dependencies
-pip install trl[vllm]==0.21.0
-pip install torch==2.7.1 torchvision==0.22.1 torchaudio==2.7.1 --index-url https://download.pytorch.org/whl/cu126
-pip install vllm==0.10.0
-pip install deepspeed bitsandbytes peft
+# Option 2: Manual installation
+conda create -n safe python=3.13
+conda activate safe
+conda install -c nvidia cuda-toolkit=13.0.2
+pip install torch==2.9.0 torchvision==0.24.0 torchaudio==2.9.0
+pip install transformers==4.57.3 trl==0.27.2 peft==0.18.0 accelerate==1.12.0
+pip install vllm==0.13.0 deepspeed==0.18.4 bitsandbytes==0.49.0
+pip install wandb datasets
 
-# Install custom RankGRPOTrainer
-bash INSTALL.sh
 ```
+
+### Key Dependencies
+
+| Package | Version | Description |
+|---------|---------|-------------|
+| Python | 3.13.11 | Runtime |
+| PyTorch | 2.9.0 | Deep learning framework |
+| TRL | 0.27.2 | Transformer Reinforcement Learning |
+| vLLM | 0.13.0 | Fast LLM inference |
+| CUDA | 13.0 | GPU acceleration |
 
 ## Project Structure
 
 ```
 SafeCRS/
-├── train_sft_safe.py           # Safe-SFT training
-├── train_grpo_safe.py          # Safe-GDPO with TRL GRPOTrainer (sequence-level)
-├── train_rank_grpo_safe.py     # Safe-GDPO with RankGRPOTrainer (item-level)
+├── train_sft_safe.py              # Safe-SFT training
+├── train_grpo_safe.py             # Safe-GDPO training
 ├── libs/
-│   ├── safe_reward_funcs.py    # Relevance, safety, count reward functions
-│   ├── safety_oracle.py        # SafetyOracle for violation checking
-│   ├── trl/rank_grpo_trainer.py # Custom RankGRPOTrainer with GDPO support
-│   └── ...
-├── evaluate/
-│   ├── eval_sft_val_safe.py    # Safe-SFT evaluation
-│   ├── eval_grpo_val.py        # GRPO validation evaluation
-│   └── eval_grpo_test.py       # Final test evaluation
-├── scripts/
-│   ├── phase0_trait_assignment/ # User trait inference via GPT
-│   ├── phase1_mapping/          # Title-to-catalog mapping
-│   └── phase2_3_saferec/        # SafeRec dataset generation
-├── configs/                     # DeepSpeed/accelerate configs
-└── docs/                        # Documentation
+│   ├── safe_reward_funcs.py       # Relevance, safety, count reward functions
+│   ├── safety_oracle.py           # SafetyOracle for violation checking
+│   ├── safety_filter.py           # Safety filtering utilities
+│   ├── constraint_injector.py     # Constraint injection for prompts
+│   ├── metrics.py                 # Evaluation metrics
+│   ├── utils.py                   # Common utilities
+│   └── trl/
+│       └── rank_grpo_trainer.py   # Custom RankGRPOTrainer with GDPO support
+└── evaluate/
+    ├── eval_sft_val_safe.py       # Safe-SFT validation evaluation
+    ├── eval_grpo_val.py           # GRPO validation evaluation
+    └── eval_grpo_test.py          # Final test evaluation
 ```
 
 ## Datasets
@@ -107,55 +115,27 @@ Safe-GDPO refines the policy using three reward signals with decoupled normaliza
 | **Safety** | `r_safe[k] = -λ·v[k]·d[k]` | Rank-discounted penalty for violations |
 | **Count** | `r_cnt = ±λ_cnt` | Encourages target recommendation count |
 
-#### Option A: TRL GRPOTrainer (Sequence-level)
+#### TRL GDPOTrainer
 
 ```bash
-torchrun --nproc_per_node=2 train_grpo_safe.py \
-    --train_path ./downloaded_datasets/processed_datasets/saferec_grpo_dataset \
-    --model_name meta-llama/Llama-3.2-3B-Instruct \
-    --sft_model_path ./results/meta-llama/Llama-3.2-3B-Instruct/checkpoint-800 \
-    --catalog_path gt_catalog_complete.pkl \
-    --advantage_mode gdpo \
-    --lr 1e-6 \
-    --kl_beta 1e-3 \
-    --lambda_safe 1.0 \
-    --penalty_safe 1.0 \
-    --per_device_train_batch_size 4 \
-    --gradient_accumulation_steps 8 \
-    --num_generations 8 \
-    --save_steps 200 \
-    --use_vllm \
-    --vllm_gpu_memory_utilization 0.4 \
-    --bf16
-```
-
-#### Option B: RankGRPOTrainer (Item-level, recommended)
-
-```bash
-torchrun --nproc_per_node=2 train_rank_grpo_safe.py \
+python train_grpo_safe.py \
     --train_path ./downloaded_datasets/processed_datasets/saferec_grpo_dataset \
     --model_name meta-llama/Llama-3.2-3B-Instruct \
     --sft_model_path ./results/meta-llama/Llama-3.2-3B-Instruct/checkpoint-800 \
     --sft_is_lora \
     --catalog_path gt_catalog_complete.pkl \
     --advantage_mode gdpo \
-    --reward_func exp_inf \
-    --use_lora \
-    --lora_r 256 \
-    --lora_alpha 512 \
     --lr 1e-6 \
     --kl_beta 1e-3 \
     --lambda_safe 1.0 \
     --penalty_safe 1.0 \
-    --lambda_count 1.0 \
-    --target_count 10 \
     --per_device_train_batch_size 4 \
     --gradient_accumulation_steps 8 \
     --num_generations 8 \
     --save_steps 200 \
-    --gradient_checkpointing \
     --use_vllm \
     --vllm_gpu_memory_utilization 0.4 \
+    --vllm_tensor_parallel_size 1 \
     --bf16
 ```
 
