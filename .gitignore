@@ -13,3 +13,5 @@ test.py
 .current_recall_train_log
 evaluate/figs_saferec/Qwen-Qwen2.5-0.5B-Instruct_loss_curve.png
 docs/
+expired/
+*.sh
