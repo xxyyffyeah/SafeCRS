@@ -84,6 +84,32 @@ SafeRec extends Reddit-V2 with personalized safety annotations:
 | Val   | ~1,127  | 2022-11 |
 | Test  | ~1,212  | 2022-12 |
 
+### Download Dataset
+
+Download the SafeCRS datasets from Hugging Face:
+
+```bash
+# Install huggingface_hub if not already installed
+pip install huggingface_hub
+
+# Download datasets
+huggingface-cli download Dionysianspirit/SafeCRS-datasets --repo-type dataset --local-dir ./downloaded_datasets
+```
+
+Or use Python:
+
+```python
+from huggingface_hub import snapshot_download
+
+snapshot_download(
+    repo_id="Dionysianspirit/SafeCRS-datasets",
+    repo_type="dataset",
+    local_dir="./downloaded_datasets"
+)
+```
+
+Dataset: [https://huggingface.co/datasets/Dionysianspirit/SafeCRS-datasets](https://huggingface.co/datasets/Dionysianspirit/SafeCRS-datasets)
+
 ## Training Pipeline
 
 ### Stage 1: Safe-SFT
